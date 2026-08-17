@@ -7,7 +7,7 @@ if "%PORT%"=="" set PORT=9222
 
 REM Kill existing TradingView instances
 taskkill /F /IM TradingView.exe >nul 2>&1
-timeout /t 2 /nobreak >nul
+"%SystemRoot%\System32\timeout.exe" /t 2 /nobreak >nul
 
 REM Auto-detect TradingView install location
 set "TV_EXE="
@@ -17,7 +17,13 @@ if exist "%LOCALAPPDATA%\TradingView\TradingView.exe" set "TV_EXE=%LOCALAPPDATA%
 if exist "%PROGRAMFILES%\TradingView\TradingView.exe" set "TV_EXE=%PROGRAMFILES%\TradingView\TradingView.exe"
 if exist "%PROGRAMFILES(x86)%\TradingView\TradingView.exe" set "TV_EXE=%PROGRAMFILES(x86)%\TradingView\TradingView.exe"
 
-REM Check MSIX / Windows Store installs
+REM Check MSIX / Windows Store installs via AppX package registration
+REM (WindowsApps blocks directory listing for normal users, so "dir /s /b" can't find it directly)
+if "%TV_EXE%"=="" (
+    set "TV_INSTALL_DIR="
+    for /f "usebackq tokens=*" %%i in (`powershell -NoProfile -Command "(Get-AppxPackage -Name '*TradingView*' | Select-Object -First 1 -ExpandProperty InstallLocation)"`) do set "TV_INSTALL_DIR=%%i"
+    if not "%TV_INSTALL_DIR%"=="" if exist "%TV_INSTALL_DIR%\TradingView.exe" set "TV_EXE=%TV_INSTALL_DIR%\TradingView.exe"
+)
 if "%TV_EXE%"=="" (
     for /f "tokens=*" %%i in ('dir /s /b "%PROGRAMFILES%\WindowsApps\TradingView*\TradingView.exe" 2^>nul') do set "TV_EXE=%%i"
 )
@@ -39,13 +45,13 @@ echo Starting with --remote-debugging-port=%PORT%...
 start "" "%TV_EXE%" --remote-debugging-port=%PORT%
 
 echo Waiting for CDP to become available...
-timeout /t 5 /nobreak >nul
+"%SystemRoot%\System32\timeout.exe" /t 5 /nobreak >nul
 
 :check
 curl -s http://localhost:%PORT%/json/version >nul 2>&1
 if %errorlevel% neq 0 (
     echo Still waiting...
-    timeout /t 2 /nobreak >nul
+    "%SystemRoot%\System32\timeout.exe" /t 2 /nobreak >nul
     goto check
 )
 
